@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#198754">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Qurban As Salam">
+  <title>Tabungan Qurban Masjid As Salam</title>
+  <script>
+    // ===== GANTI DENGAN URL WEB APP GAS ANDA (berakhiran /exec) =====
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwofwBPs7xrDmi-NnGUn7o8gH-rmW9qM_vAIlsqggZpyzH7pXGocJtFPQqD0Uo1xEiS/exec';
+    // Adaptor: meniru google.script.run agar sisa kode tidak perlu diubah
+    function gasBuilder(ok, fail) {
+      return new Proxy({}, { get(_, prop) {
+        if (prop === 'withSuccessHandler') return f => gasBuilder(f, fail);
+        if (prop === 'withFailureHandler') return f => gasBuilder(ok, f);
+        return (...args) => {
+          fetch(GAS_URL, { method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ fn: prop, args: args }) })
+          .then(r => r.json())
+          .then(j => { if (j.error) throw new Error(j.error); if (ok) ok(j.result); })
+          .catch(e => {
+            if (fail) { fail(e); return; }
+            var l = document.getElementById('loading'); if (l) l.classList.add('hidden');
+            alert('Gagal terhubung ke server: ' + e.message);
+          });
+        };
+      }});
+    }
+    window.google = { script: { run: gasBuilder() } };
+  </script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; background-color: #f4f7f6; padding-bottom: 85px; }
+    .bg-masjid { background: linear-gradient(135deg, #198754, #0f5132); color: white; }
+    .card-Stat { border-left: 5px solid #198754; }
+    .hidden { display: none !important; }
+    .loading-spinner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 10px; }
+
+    /* ===== BOTTOM NAV ===== */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white; box-shadow: 0 -4px 15px rgba(0,0,0,0.08);
+      display: flex; justify-content: space-around;
+      padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+      z-index: 1000;
+    }
+    @media (min-width: 768px) {
+      .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); border-radius: 20px 20px 0 0; }
+    }
+    .bottom-nav .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 6px 4px; background: none; border: none; color: #888;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      transition: all .2s; border-radius: 10px; margin: 0 4px;
+    }
+    .bottom-nav .nav-item i { font-size: 20px; margin-bottom: 2px; transition: transform .2s; }
+    .bottom-nav .nav-item.active { color: #198754; background: #e8f5e9; }
+    .bottom-nav .nav-item.active i { transform: scale(1.15); }
+    .bottom-nav .nav-item:active { background: #f0f0f0; }
+
+    /* ===== TAB ===== */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeInUp .3s ease; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== MOBILE OPTIM ===== */
+    @media (max-width: 767px) {
+      h1 { font-size: 1.4rem !important; }
+      h3 { font-size: 1.15rem !important; }
+      h2 { font-size: 1.4rem !important; }
+      .card { border-radius: 12px !important; }
+      .container { padding-left: 12px; padding-right: 12px; }
+      .table { font-size: 12px; }
+      .btn { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading" class="loading-spinner hidden text-center shadow">
+    <div class="spinner-border text-success mb-2" role="status"></div>
+    <div>Memproses Data...</div>
+  </div>
+
+  <!-- ========== BOTTOM NAV ========== -->
+  <nav id="bottomNav" class="bottom-nav"></nav>
+
+  <!-- ========== HALAMAN AWAL ========== -->
+  <div id="halaman-awal" class="container my-4">
+
+    <!-- Tab Beranda -->
+    <div id="tab-beranda" class="tab-content active">
+      <div class="p-4 p-md-5 text-center bg-masjid rounded-3 shadow mb-4">
+        <h1 class="fw-bold">Tabungan Qurban Masjid As Salam</h1>
+        <p class="lead fw-bold">"Raih Berkah Qurban dengan Langkah Ringan"</p>
+        <p class="lead fs-6">
+          Hubungi:
+          <a href="https://wa.me/6281213758118" target="_blank" class="text-white fw-bold text-decoration-none">Bpk Anto</a>,
+          <a href="https://wa.me/6285264084671" target="_blank" class="text-white fw-bold text-decoration-none">Bpk Andi</a>,
+          <a href="https://wa.me/6282172753583" target="_blank" class="text-white fw-bold text-decoration-none">Bpk Wanda</a>
+        </p>
+        <p class="lead fs-6 fw-bold mb-0">Rek Masjid As Salam : BSI 7338306371</p>
+      </div>
+
+      <div class="row g-3 mb-4 text-center">
+        <div class="col-6">
+          <div class="card p-3 shadow-sm card-Stat h-100">
+            <h6 class="text-muted small mb-1">Total Dana</h6>
+            <h4 class="fw-bold text-success mb-0" id="stat-total-dana">Rp 0</h4>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card p-3 shadow-sm card-Stat h-100" onclick="bukaPopupDetailJamaah()" style="cursor:pointer" onmouseover="this.style.backgroundColor='#e8f5e9'" onmouseout="this.style.backgroundColor='#fff'">
+            <h6 class="text-muted small mb-1">Jamaah <span class="badge bg-secondary" style="font-size:9px">Detail</span></h6>
+            <h4 class="fw-bold text-success mb-0" id="stat-total-jamaah">0</h4>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 shadow-sm border-0">
+        <h5 class="fw-bold text-success mb-3">Selamat Datang!</h5>
+        <p class="text-muted small">Silakan masuk ke dashboard atau daftar sebagai peserta baru.</p>
+        <div class="d-grid gap-2">
+          <button class="btn btn-success fw-bold py-2" onclick="switchTab('masuk')">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Masuk ke Dashboard
+          </button>
+          <button class="btn btn-outline-success fw-bold py-2" onclick="switchTab('daftar')">
+            <i class="bi bi-person-plus me-2"></i>Daftar Sebagai Peserta
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Masuk -->
+    <div id="tab-masuk" class="tab-content">
+      <div class="card p-4 shadow-sm border-0">
+        <h4 class="text-success fw-bold mb-3"><i class="bi bi-box-arrow-in-right me-2"></i>Masuk</h4>
+        <form id="formLogin">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">No. WhatsApp</label>
+            <input type="number" id="loginWA" class="form-control form-control-lg" placeholder="0812345678" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="password" id="loginPass" class="form-control form-control-lg" required>
+          </div>
+          <button type="button" onclick="login()" class="btn btn-success w-100 py-2 fw-bold">Masuk Sekarang</button>
+        </form>
+        <p class="text-center text-muted mt-3 mb-0 small">Belum punya akun? <a href="#" onclick="switchTab('daftar');return false" class="text-success fw-bold">Daftar</a></p>
+      </div>
+    </div>
+
+    <!-- Tab Daftar -->
+    <div id="tab-daftar" class="tab-content">
+      <div class="card p-4 shadow-sm border-0">
+        <h4 class="text-success fw-bold mb-3"><i class="bi bi-person-plus me-2"></i>Pendaftaran Baru</h4>
+        <form id="formDaftar">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nama Lengkap</label>
+            <input type="text" id="regNama" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">No. WhatsApp</label>
+            <input type="number" id="regWA" class="form-control" placeholder="0812345678" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Paket Qurban</label>
+            <select id="regPaket" class="form-select">
+              <option value="Kambing">Kambing + operasional (Rp3.750.000)</option>
+              <option value="Sepertujuh Sapi">1/7 Sapi + operasional (Rp3.750.000)</option>
+              <option value="Aqiqah">Aqiqah + operasional (Rp4.250.000)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="password" id="regPass" class="form-control" placeholder="Minimal 4 karakter" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Alamat Rumah</label>
+            <textarea id="regAlamat" class="form-control" rows="2" placeholder="Fanindo Blok ..." required></textarea>
+          </div>
+          <button type="button" onclick="daftar()" class="btn btn-outline-success w-100 py-2 fw-bold">Daftar Akun</button>
+        </form>
+        <p class="text-center text-muted mt-3 mb-0 small">Sudah punya akun? <a href="#" onclick="switchTab('masuk');return false" class="text-success fw-bold">Masuk</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== HALAMAN JAMAAH ========== -->
+  <div id="halaman-jamaah" class="container my-4 hidden">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h5 class="fw-bold mb-0 text-success">Assalamu'alaikum, <span id="j-nama">Jamaah</span></h5>
+        <small class="text-muted" id="j-id">ID: QRB000</small>
+      </div>
+      <button onclick="logout()" class="btn btn-sm btn-danger fw-bold"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button>
+    </div>
+
+    <!-- Tab Dashboard -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="card p-3 shadow-sm bg-success text-white">
+            <h6 class="mb-1"><i class="bi bi-wallet2 me-1"></i>Total Tabungan Anda</h6>
+            <h2 class="fw-bold mb-0" id="j-terkumpul">Rp 0</h2>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card p-3 shadow-sm bg-warning text-dark h-100">
+            <h6 class="small mb-1">Sisa Kekurangan</h6>
+            <h4 class="fw-bold mb-0" id="j-sisa">Rp 0</h4>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card p-3 shadow-sm bg-light text-dark h-100">
+            <h6 class="small mb-1">Target (<span id="j-paket">Paket</span>)</h6>
+            <h4 class="fw-bold mb-0" id="j-target">Rp 0</h4>
+          </div>
+        </div>
+      </div>
+      <div class="card p-3 shadow-sm border-0 mt-3">
+        <h6 class="fw-bold text-success mb-2">Aksi Cepat</h6>
+        <div class="d-grid gap-2">
+          <button class="btn btn-success fw-bold" onclick="switchTab('setor')"><i class="bi bi-cash-coin me-2"></i>Setor Tabungan</button>
+          <button class="btn btn-outline-success fw-bold" onclick="switchTab('riwayat')"><i class="bi bi-clock-history me-2"></i>Lihat Riwayat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Setor -->
+    <div id="tab-setor" class="tab-content">
+      <div class="card shadow-sm border-0 p-4">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-cash-coin me-2"></i>Konfirmasi Pembayaran</h5>
+        <form id="formSetoran">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nominal Setor (Rp)</label>
+            <input type="number" id="setorNominal" class="form-control form-control-lg" placeholder="500000" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Upload Bukti Transfer</label>
+            <input type="file" id="setorFile" class="form-control" accept="image/*" required>
+            <small class="text-muted">Format JPG/PNG</small>
+          </div>
+          <button type="button" onclick="kirimSetoran()" class="btn btn-success w-100 py-2 fw-bold"><i class="bi bi-send me-2"></i>Kirim Bukti</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tab Riwayat -->
+    <div id="tab-riwayat" class="tab-content">
+      <div class="card shadow-sm border-0 p-3">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-clock-history me-2"></i>Riwayat Setoran</h5>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr><th>ID</th><th>Tanggal</th><th>Nominal</th><th>Status</th></tr>
+            </thead>
+            <tbody id="tabel-riwayat-jamaah"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== HALAMAN ADMIN ========== -->
+  <div id="halaman-admin" class="container my-4 hidden">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h5 class="fw-bold mb-0 text-success">Dashboard Panitia</h5>
+        <small class="text-muted">Manajemen Tabungan Qurban</small>
+      </div>
+      <button onclick="logout()" class="btn btn-sm btn-danger fw-bold"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button>
+    </div>
+
+    <!-- Tab Input -->
+    <div id="tab-input" class="tab-content active">
+      <div class="card shadow-sm border-0 p-4" style="background-color:#e8f5e9">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-pencil-square me-2"></i>Input Pembayaran</h5>
+        <form id="formAdminInput">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Pilih Jamaah</label>
+            <select id="admPilihJamaah" class="form-select form-select-lg" required>
+              <option value="">- Pilih Jamaah -</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Jumlah (Rp)</label>
+            <input type="number" id="admNominal" class="form-control form-control-lg" placeholder="300000" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Metode</label>
+            <select id="admMetode" class="form-select form-select-lg">
+              <option value="Cash">Cash</option>
+              <option value="Transfer">Transfer</option>
+            </select>
+          </div>
+          <button type="button" onclick="adminSimpanPembayaran()" class="btn btn-success w-100 py-2 fw-bold"><i class="bi bi-save me-2"></i>Simpan Data</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tab Peserta -->
+    <div id="tab-peserta" class="tab-content">
+      <div class="card shadow-sm border-0 p-3">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-people-fill me-2"></i>Rekap Peserta</h5>
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered align-middle" style="font-size:12px">
+            <thead class="table-success">
+              <tr><th>ID</th><th>Nama</th><th>WA</th><th>Paket</th><th>Target</th><th>Terkumpul</th><th>Sisa</th><th>Alamat</th><th>QR</th></tr>
+            </thead>
+            <tbody id="tabel-admin-peserta"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Transaksi -->
+    <div id="tab-transaksi" class="tab-content">
+      <div class="card shadow-sm border-0 p-3">
+        <h5 class="fw-bold text-success mb-3"><i class="bi bi-receipt me-2"></i>Daftar Pembayaran</h5>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle" style="font-size:12px">
+            <thead>
+              <tr><th>ID</th><th>Nama</th><th>Tgl</th><th>Nominal</th><th>Metode</th><th>Bukti</th><th>Status</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tabel-admin-transaksi"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="modalDetailJamaah" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title fw-bold">Daftar Peserta Qurban</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">*Daftar jamaah yang telah bergabung.</p>
+          <ol id="list-nama-popup" class="list-group list-group-numbered"></ol>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var globalIdJamaah = "";
+    var currentState = 'public';
+    var currentTab = { public: 'beranda', jamaah: 'dashboard', admin: 'input' };
+
+    /* ============ BOTTOM NAV ============ */
+    function renderBottomNav() {
+      var nav = document.getElementById('bottomNav');
+      var html = '';
+      if (currentState === 'public') {
+        html =
+          '<button class="nav-item ' + (currentTab.public==='beranda'?'active':'') + '" onclick="switchTab(\'beranda\')"><i class="bi bi-house-door-fill"></i><span>Beranda</span></button>' +
+          '<button class="nav-item ' + (currentTab.public==='masuk'?'active':'') + '" onclick="switchTab(\'masuk\')"><i class="bi bi-box-arrow-in-right"></i><span>Masuk</span></button>' +
+          '<button class="nav-item ' + (currentTab.public==='daftar'?'active':'') + '" onclick="switchTab(\'daftar\')"><i class="bi bi-person-plus-fill"></i><span>Daftar</span></button>';
+      } else if (currentState === 'jamaah') {
+        html =
+          '<button class="nav-item ' + (currentTab.jamaah==='dashboard'?'active':'') + '" onclick="switchTab(\'dashboard\')"><i class="bi bi-speedometer2"></i><span>Dashboard</span></button>' +
+          '<button class="nav-item ' + (currentTab.jamaah==='setor'?'active':'') + '" onclick="switchTab(\'setor\')"><i class="bi bi-cash-coin"></i><span>Setor</span></button>' +
+          '<button class="nav-item ' + (currentTab.jamaah==='riwayat'?'active':'') + '" onclick="switchTab(\'riwayat\')"><i class="bi bi-clock-history"></i><span>Riwayat</span></button>';
+      } else if (currentState === 'admin') {
+        html =
+          '<button class="nav-item ' + (currentTab.admin==='input'?'active':'') + '" onclick="switchTab(\'input\')"><i class="bi bi-pencil-square"></i><span>Input</span></button>' +
+          '<button class="nav-item ' + (currentTab.admin==='peserta'?'active':'') + '" onclick="switchTab(\'peserta\')"><i class="bi bi-people-fill"></i><span>Peserta</span></button>' +
+          '<button class="nav-item ' + (currentTab.admin==='transaksi'?'active':'') + '" onclick="switchTab(\'transaksi\')"><i class="bi bi-receipt"></i><span>Transaksi</span></button>';
+      }
+      nav.innerHTML = html;
+    }
+
+    function switchTab(tabName) {
+      currentTab[currentState] = tabName;
+      var activeSection = document.getElementById(
+        currentState === 'public' ? 'halaman-awal' :
+        currentState === 'jamaah' ? 'halaman-jamaah' : 'halaman-admin'
+      );
+      if (activeSection) {
+        activeSection.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+        var target = document.getElementById('tab-' + tabName);
+        if (target) target.classList.add('active');
+      }
+      renderBottomNav();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    /* ============ INIT ============ */
+    window.onload = function() {
+      renderBottomNav();
+      refreshStatistik();
+      // Scan QR: alamat berbentuk ...?id=QRB001 (dibaca langsung dari URL, bukan google.script.url)
+      var idScan = new URLSearchParams(window.location.search).get('id');
+      if (idScan) {
+        tampilkanLoading(true);
+        google.script.run.withSuccessHandler(function(adaJamaah) {
+          tampilkanLoading(false);
+          if (adaJamaah) {
+            globalIdJamaah = idScan;
+            currentTab.jamaah = 'dashboard';
+            bukaHalamanJamaah(idScan);
+          } else {
+            alert("QR Code tidak valid atau data jamaah tidak ditemukan!");
+          }
+        }).ambilDataJamaahSaja(idScan);
+      }
+    };
+
+    /* ============ UTILS ============ */
+    function refreshStatistik() {
+      tampilkanLoading(true);
+      google.script.run.withSuccessHandler(function(data) {
+        document.getElementById("stat-total-dana").innerText = formatRupiah(data.totalDana);
+        document.getElementById("stat-total-jamaah").innerText = data.totalJamaah + " Orang";
+        tampilkanLoading(false);
+      }).getStatistikRingkas();
+    }
+    function tampilkanLoading(show) {
+      var l = document.getElementById("loading");
+      show ? l.classList.remove("hidden") : l.classList.add("hidden");
+    }
+    function formatRupiah(angka) { return 'Rp ' + angka.toLocaleString('id-ID'); }
+
+    /* ============ DAFTAR & LOGIN ============ */
+    function daftar() {
+      var nama = document.getElementById("regNama").value;
+      var wa = document.getElementById("regWA").value;
+      var paket = document.getElementById("regPaket").value;
+      var pass = document.getElementById("regPass").value;
+      var alamat = document.getElementById("regAlamat").value;
+      if (!nama || !wa || !pass || !alamat) { alert("Semua kolom termasuk Alamat wajib diisi!"); return; }
+      tampilkanLoading(true);
+      google.script.run.withSuccessHandler(function(respon) {
+        tampilkanLoading(false);
+        alert(respon.pesan);
+        if (respon.sukses) {
+          document.getElementById("formDaftar").reset();
+          refreshStatistik();
+          switchTab('masuk');
+        }
+      }).daftarJamaahBaru(nama, wa, paket, pass, alamat);
+    }
+
+    function login() {
+      var wa = document.getElementById("loginWA").value;
+      var pass = document.getElementById("loginPass").value;
+      if (!wa || !pass) { alert("Silakan isi Nomor WA dan Password!"); return; }
+      tampilkanLoading(true);
+      google.script.run.withSuccessHandler(function(respon) {
+        tampilkanLoading(false);
+        if (respon.sukses) {
+          document.getElementById("halaman-awal").classList.add("hidden");
+          if (respon.role === "Admin") {
+            currentTab.admin = 'input';
+            loadOpsiJamaahUntukAdmin();
+            bukaHalamanAdmin();
+          } else {
+            globalIdJamaah = respon.idJamaah;
+            currentTab.jamaah = 'dashboard';
+            bukaHalamanJamaah(respon.idJamaah);
+          }
+        } else { alert(respon.pesan); }
+      }).prosesLogin(wa, pass);
+    }
+
+    /* ============ MODAL ============ */
+    function bukaPopupDetailJamaah() {
+      tampilkanLoading(true);
+      google.script.run.withSuccessHandler(function(listJamaah) {
+        var c = document.getElementById("list-nama-popup");
+        c.innerHTML = "";
+        if (listJamaah.length === 0) {
+          c.innerHTML = '<li class="list-group-item text-center text-muted">Belum ada jamaah.</li>';
+        } else {
+          listJamaah.forEach(function(j){
+            c.innerHTML += '<li class="list-group-item text-dark"><div class="fw-bold">'+j.nama+'</div><small class="text-muted" style="font-size:11px"><i class="bi bi-geo-alt"></i> '+j.alamat+'</small></li>';
+          });
+        }
+        tampilkanLoading(false);
+        new bootstrap.Modal(document.getElementById('modalDetailJamaah')).show();
+      }).getDetailSemuaJamaah();
+    }
+
+    /* ============ JAMAAH ============ */
+    function bukaHalamanJamaah(idJamaah) {
+      tampilkanLoading(true);
+      currentState = 'jamaah';
+      document.getElementById('halaman-awal').classList.add('hidden');
+      document.getElementById('halaman-jamaah').classList.remove('hidden');
+      document.getElementById('halaman-admin').classList.add('hidden');
+      switchTab(currentTab.jamaah || 'dashboard');
+
+      google.script.run.withSuccessHandler(function(data) {
+        document.getElementById("j-nama").innerText = data.profil.nama;
+        document.getElementById("j-id").innerText = "ID: " + data.profil.id;
+        document.getElementById("j-terkumpul").innerText = formatRupiah(data.profil.terkumpul);
+        document.getElementById("j-sisa").innerText = formatRupiah(data.profil.sisa);
+        document.getElementById("j-paket").innerText = data.profil.paket;
+        document.getElementById("j-target").innerText = formatRupiah(data.profil.target);
+        var tbody = document.getElementById("tabel-riwayat-jamaah");
+        tbody.innerHTML = "";
+        data.riwayat.forEach(function(t) {
+          var badge = t.status === "Valid" ? "bg-success" : "bg-warning text-dark";
+          tbody.innerHTML += '<tr><td>'+t.idTrans+'</td><td>'+t.tanggal+'</td><td>'+formatRupiah(t.nominal)+'</td><td><span class="badge '+badge+'">'+t.status+'</span></td></tr>';
+        });
+        tampilkanLoading(false);
+      }).getDataJamaah(idJamaah);
+    }
+
+    // Perkecil foto bukti transfer (maks 1280px, JPEG) agar upload cepat & hemat kuota
+    function kompresGambar(file, cb) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function() {
+        var s = Math.min(1, 1280 / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        cb(c.toDataURL('image/jpeg', 0.75), file.name.replace(/\.[^.]+$/, '') + '.jpg');
+      };
+      img.onerror = function() {
+        URL.revokeObjectURL(url);
+        var r = new FileReader();
+        r.onload = function(e) { cb(e.target.result, file.name); };
+        r.readAsDataURL(file);
+      };
+      img.src = url;
+    }
+
+    function kirimSetoran() {
+      var nominal = document.getElementById("setorNominal").value;
+      var fileInput = document.getElementById("setorFile");
+
+      if (!nominal || fileInput.files.length === 0) {
+        alert("Mohon isi nominal dan upload foto bukti!");
+        return;
+      }
+
+      tampilkanLoading(true);
+      kompresGambar(fileInput.files[0], function(dataUrl, namaFile) {
+        google.script.run.withSuccessHandler(function(respon) {
+          tampilkanLoading(false);
+          if (respon.sukses) {
+            alert("✅ Bukti transfer berhasil dikirim!\n\nAdmin otomatis menerima notifikasi WhatsApp dan akan segera memverifikasi.\n\nAnda juga akan menerima notifikasi setelah diverifikasi.");
+            document.getElementById("formSetoran").reset();
+            currentTab.jamaah = 'riwayat';
+            bukaHalamanJamaah(globalIdJamaah);
+          } else {
+            alert(respon.pesan);
+          }
+        }).simpanSetoranJamaah(globalIdJamaah, nominal, dataUrl, namaFile);
+      });
+    }
+
+    /* ============ ADMIN ============ */
+    function loadOpsiJamaahUntukAdmin() {
+      google.script.run.withSuccessHandler(function(listJamaah) {
+        var d = document.getElementById("admPilihJamaah");
+        d.innerHTML = '<option value="">-- Pilih Jamaah --</option>';
+        listJamaah.forEach(function(j){ d.innerHTML += '<option value="'+j.id+'">'+j.nama+' ('+j.id+')</option>'; });
+      }).getDaftarOpsiJamaah();
+    }
+
+    function adminSimpanPembayaran() {
+      var idJamaah = document.getElementById("admPilihJamaah").value;
+      var nominal = document.getElementById("admNominal").value;
+      var metode = document.getElementById("admMetode").value;
+      if(!idJamaah || !nominal) { alert("Pilih jamaah dan isi nominal!"); return; }
+      tampilkanLoading(true);
+      google.script.run.withSuccessHandler(function(respon) {
+        tampilkanLoading(false);
+        alert(respon.pesan);
+        if(respon.sukses) {
+          document.getElementById("formAdminInput").reset();
+          bukaHalamanAdmin();
+        }
+      }).inputPembayaranOlehAdmin(idJamaah, nominal, metode);
+    }
+
+    function bukaHalamanAdmin() {
+      tampilkanLoading(true);
+      currentState = 'admin';
+      document.getElementById('halaman-awal').classList.add('hidden');
+      document.getElementById('halaman-jamaah').classList.add('hidden');
+      document.getElementById('halaman-admin').classList.remove('hidden');
+      switchTab(currentTab.admin || 'input');
+
+      google.script.run.withSuccessHandler(function(transaksi) {
+        var tbodyT = document.getElementById("tabel-admin-transaksi");
+        tbodyT.innerHTML = "";
+        transaksi.forEach(function(t) {
+          var badge = t.status === "Valid" ? "bg-success" : "bg-warning text-dark";
+          var tombol = t.status === "Pending" ? '<button class="btn btn-sm btn-success fw-bold" onclick="verifikasi('+t.baris+')">Verifikasi</button>' : '<span class="text-muted">-</span>';
+          var linkBukti = t.bukti !== "-" ? '<a href="'+t.bukti+'" target="_blank" class="btn btn-sm btn-outline-info">Lihat</a>' : '<span>-</span>';
+          tbodyT.innerHTML += '<tr><td>'+t.idTrans+'</td><td>'+t.nama+'</td><td>'+t.tanggal+'</td><td>'+formatRupiah(t.nominal)+'</td><td>'+t.metode+'</td><td>'+linkBukti+'</td><td><span class="badge '+badge+'">'+t.status+'</span></td><td>'+tombol+'</td></tr>';
+        });
+        muatTabelPesertaAdmin();
+      }).getDataAdmin();
+    }
+
+    function muatTabelPesertaAdmin() {
+      google.script.run.withSuccessHandler(function(listPeserta) {
+        var tbodyP = document.getElementById("tabel-admin-peserta");
+        tbodyP.innerHTML = "";
+        // QR kini mengarah ke alamat PWA ini (GitHub Pages), bukan ke alamat Apps Script
+        var alamatApp = window.location.href.split('?')[0].split('#')[0];
+        listPeserta.forEach(function(p) {
+          var linkScanUjung = alamatApp + "?id=" + p.id;
+          var urlQRCode = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + encodeURIComponent(linkScanUjung);
+          tbodyP.innerHTML += '<tr><td class="fw-bold">'+p.id+'</td><td class="fw-bold text-dark">'+p.nama+'</td><td><a href="https://wa.me/'+p.wa+'" target="_blank" class="text-decoration-none">WA</a></td><td><span class="badge bg-secondary">'+p.paket+'</span></td><td>'+formatRupiah(p.target)+'</td><td class="text-success fw-bold">'+formatRupiah(p.terkumpul)+'</td><td class="text-danger fw-bold">'+formatRupiah(p.sisa)+'</td><td class="text-muted">'+p.alamat+'</td><td><a href="'+urlQRCode+'" target="_blank" class="btn btn-sm btn-dark fw-bold">QR</a></td></tr>';
+        });
+        tampilkanLoading(false);
+      }).getRekapSemuaPesertaAdmin();
+    }
+
+    function verifikasi(noBaris) {
+      if(confirm("Yakin uang transfer ini sudah masuk?")) {
+        tampilkanLoading(true);
+        google.script.run.withSuccessHandler(function(pesan) {
+          alert(pesan);
+          bukaHalamanAdmin();
+        }).verifikasiTransaksi(noBaris);
+      }
+    }
+
+    /* ============ LOGOUT ============ */
+    function logout() {
+      currentState = 'public';
+      currentTab = { public: 'beranda', jamaah: 'dashboard', admin: 'input' };
+      document.getElementById("halaman-jamaah").classList.add("hidden");
+      document.getElementById("halaman-admin").classList.add("hidden");
+      document.getElementById("halaman-awal").classList.remove("hidden");
+      document.getElementById("formLogin").reset();
+      globalIdJamaah = "";
+      switchTab('beranda');
+      refreshStatistik();
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() { navigator.serviceWorker.register('./sw.js').catch(function() {}); });
+    }
+  </script>
+</body>
+</html>
