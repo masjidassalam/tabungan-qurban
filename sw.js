@@ -1,5 +1,5 @@
 // Naikkan angka versi ini setiap kali index.html diubah agar HP memuat versi terbaru
-const VERSI = 'qurban-v1';
+const VERSI = 'qurban-v2';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
